@@ -20,11 +20,13 @@ type AppConfig struct {
 	Cookie  string                       `json:"cookie"`
 
 	User struct {
-		Name    string `json:"name"`
-		Address string `json:"address"`
-		Zipcode string `json:"zipcode"`
-		Country string `json:"country"`
-		Phone   string `json:"phone"`
+		Name     string `json:"name"`
+		Address  string `json:"address"`
+		Province string `json:"province"`
+		City     string `json:"city"`
+		Zipcode  string `json:"zipcode"`
+		Country  string `json:"country"`
+		Phone    string `json:"phone"`
 	} `json:"user"`
 
 	CheckoutOptions struct {

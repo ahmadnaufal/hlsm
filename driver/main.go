@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -17,8 +16,6 @@ func main() {
 		log.Println(err)
 		return
 	}
-
-	fmt.Println(tickets)
 
 	err = app.PostTickets(tickets)
 	if err != nil {

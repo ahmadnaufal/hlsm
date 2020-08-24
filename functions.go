@@ -36,16 +36,22 @@ func (a App) GetTicketDetails() ([]Ticket, error) {
 	req := a.prepareRequest("GET", a.URLForm, nil)
 	formResp, err := a.Client.Do(req)
 	if err != nil {
-		return tickets, err
+		return nil, err
 	}
 	defer formResp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(formResp.Body)
 	if err != nil {
-		return tickets, err
+		return nil, err
 	}
 
-	container := doc.Find("#mainContent .post")
+	mainContainer := doc.Find("#mainContent")
+	title := mainContainer.Find(".pagetitle > h2").Text()
+	container := mainContainer.Find(".post")
+
+	if strings.ToLower(strings.TrimSpace(title)) == "kesalahan" {
+		return nil, fmt.Errorf("Terjadi kesalahan: %s", container.Find("p").Text())
+	}
 
 	// For each item found, get the band and title
 	for _, ticket := range a.Config.Tickets {
@@ -58,7 +64,7 @@ func (a App) GetTicketDetails() ([]Ticket, error) {
 				checker := container.Find(rowQuery)
 				if checker.Length() < 1 {
 					err = fmt.Errorf("Error: Tiket untuk member %s sesi %s tidak ditemukan", member, sesi)
-					return tickets, err
+					return nil, err
 				}
 
 				memberName := checker.Text()
@@ -85,19 +91,25 @@ func (a App) PostTickets(tickets []Ticket) error {
 	form.Add("x", "144")
 	form.Add("y", "13")
 
-	req := a.prepareRequest("POST", a.URLForm, nil)
+	req := a.prepareRequest("POST", a.URLForm, form)
 	formResp, err := a.Client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer formResp.Body.Close()
 
-	_, err = goquery.NewDocumentFromReader(formResp.Body)
+	doc, err := goquery.NewDocumentFromReader(formResp.Body)
 	if err != nil {
 		return err
 	}
 
-	// TODO parse document
+	mainContainer := doc.Find("#mainContent")
+	title := mainContainer.Find(".pagetitle > h2").Text()
+	container := mainContainer.Find(".post")
+
+	if strings.ToLower(strings.TrimSpace(title)) == "kesalahan" {
+		return fmt.Errorf("Terjadi kesalahan: %s", container.Find("p").Text())
+	}
 
 	return nil
 }
@@ -137,8 +149,6 @@ func (a App) buildAddressPayload() url.Values {
 
 	// default params
 	address.Set("agree", "1")
-	address.Set("provinsi", "")
-	address.Set("kota", "")
 	address.Set("x", "90")
 	address.Set("y", "13")
 
@@ -150,6 +160,8 @@ func (a App) buildAddressPayload() url.Values {
 	address.Set("zipcode", a.Config.User.Zipcode)
 	address.Set("country", a.Config.User.Country)
 	address.Set("phone", a.Config.User.Phone)
+	address.Set("provinsi", a.Config.User.Province)
+	address.Set("kota", a.Config.User.City)
 
 	return address
 }
