@@ -19,6 +19,8 @@
   "user": {
     "name": "Ahmad Farhan",
     "address": "Jl. Kenangan",
+    "province": "Jawa Barat",
+    "city": "Kota Bandung",
     "zipcode": "40666",
     "country": "ID",
     "phone": "08123123123"
