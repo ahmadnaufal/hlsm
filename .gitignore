@@ -19,4 +19,3 @@ apply
 # html debug output
 out.html
 debug/*.html
-fixture/*.html
