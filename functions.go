@@ -3,13 +3,11 @@ package hlsm
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
 func (a App) prepareRequest(method, url string, data url.Values) *http.Request {
@@ -31,8 +29,6 @@ func (a App) prepareRequest(method, url string, data url.Values) *http.Request {
 }
 
 func (a App) GetTicketDetails() ([]Ticket, error) {
-	tickets := []Ticket{}
-
 	req := a.prepareRequest("GET", a.URLForm, nil)
 	formResp, err := a.Client.Do(req)
 	if err != nil {
@@ -40,30 +36,26 @@ func (a App) GetTicketDetails() ([]Ticket, error) {
 	}
 	defer formResp.Body.Close()
 
-	doc, err := goquery.NewDocumentFromReader(formResp.Body)
+	container, title, err := readParseHTMLBody(formResp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	mainContainer := doc.Find("#mainContent")
-	title := mainContainer.Find(".pagetitle > h2").Text()
-	container := mainContainer.Find(".post")
+	log.Printf("[GET-TicketDetails] On page: %s", title)
 
-	if strings.ToLower(strings.TrimSpace(title)) == "kesalahan" {
-		return nil, fmt.Errorf("Terjadi kesalahan: %s", container.Find("p").Text())
-	}
-
-	// For each item found, get the band and title
+	// For each item found
+	tickets := []Ticket{}
 	for _, ticket := range a.Config.Tickets {
 		for member := range ticket {
 			for sesi := range ticket[member] {
-				sesiName := fmt.Sprintf("Sesi%s", sesi)
+				sesiNum, _ := strconv.ParseInt(sesi, 10, 32)
+				sesiName := fmt.Sprintf("Sesi%d", sesiNum)
 				sesiQty := ticket[member][sesi]
 
 				rowQuery := `div:contains("` + sesiName + `") > a:contains("` + member + `")`
 				checker := container.Find(rowQuery)
 				if checker.Length() < 1 {
-					err = fmt.Errorf("Error: Tiket untuk member %s sesi %s tidak ditemukan", member, sesi)
+					err = fmt.Errorf("Error: Tiket untuk member dengan kata kunci \"%s\" sesi %s tidak ditemukan", member, sesi)
 					return nil, err
 				}
 
@@ -73,7 +65,7 @@ func (a App) GetTicketDetails() ([]Ticket, error) {
 				tickets = append(tickets, Ticket{
 					Name:     memberName,
 					FormName: formName,
-					Session:  sesiName,
+					Session:  uint(sesiNum),
 					Quantity: sesiQty,
 				})
 			}
@@ -98,17 +90,16 @@ func (a App) PostTickets(tickets []Ticket) error {
 	}
 	defer formResp.Body.Close()
 
-	doc, err := goquery.NewDocumentFromReader(formResp.Body)
+	container, title, err := readParseHTMLBody(formResp.Body)
 	if err != nil {
 		return err
 	}
 
-	mainContainer := doc.Find("#mainContent")
-	title := mainContainer.Find(".pagetitle > h2").Text()
-	container := mainContainer.Find(".post")
+	log.Printf("[POST-Tickets] On page: %s", title)
 
-	if strings.ToLower(strings.TrimSpace(title)) == "kesalahan" {
-		return fmt.Errorf("Terjadi kesalahan: %s", container.Find("p").Text())
+	paymentMethodDropdown := container.Find("select#paymethod")
+	if strings.TrimSpace(paymentMethodDropdown.Text()) == "" {
+		return fmt.Errorf("Error: Kamu sudah tidak dapat membeli tiket untuk HS ID: %d", a.Config.HID)
 	}
 
 	return nil
@@ -124,8 +115,12 @@ func (a App) PostAddress() error {
 	}
 	defer resp.Body.Close()
 
-	addressBody, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println(string(addressBody))
+	_, title, err := readParseHTMLBody(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[POST-Address] On page: %s", title)
 
 	return nil
 }
@@ -138,8 +133,12 @@ func (a App) PostFinal() error {
 	}
 	defer compResp.Body.Close()
 
-	compBody, _ := ioutil.ReadAll(compResp.Body)
-	fmt.Println(string(compBody))
+	_, title, err := readParseHTMLBody(compResp.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[POST-Comply] On page: %s", title)
 
 	return nil
 }
